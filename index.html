@@ -351,6 +351,10 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   var joined = { 4: false, 5: false };
   var factLine = { 4: '2 and 2', 5: '3 and 2' };
   var pendingKn = '';
+  var audioCtx = null;
+  var primed = false;
+  var keepTimer = 0;
+  var sayToken = 0;
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var stage = document.getElementById('stage');
@@ -365,43 +369,111 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   function landscape() {
     return window.innerHeight < 520 && window.innerWidth > window.innerHeight;
   }
-  function knVoice() {
+  function voices() {
     var synth = window.speechSynthesis;
-    if (!synth || !synth.getVoices) return null;
-    var list = [];
-    try { list = synth.getVoices() || []; } catch (e) { return null; }
+    if (!synth || !synth.getVoices) return [];
+    try { return synth.getVoices() || []; } catch (e) { return []; }
+  }
+  function knVoice() {
+    var list = voices();
     for (var i = 0; i < list.length; i++) {
       if (String(list[i].lang || '').toLowerCase().indexOf('kn') === 0) return list[i];
     }
     return null;
   }
-  function speakKn(kn, voice) {
+  // iOS pauses a long utterance unless resume() keeps the engine awake.
+  function armKeepAlive() {
+    var synth = window.speechSynthesis;
+    if (!synth || keepTimer) return;
+    keepTimer = setInterval(function () {
+      var active = false;
+      try { active = !!(synth.speaking || synth.pending); } catch (e) {}
+      if (!active) {
+        clearInterval(keepTimer);
+        keepTimer = 0;
+        return;
+      }
+      try { if (synth.resume) synth.resume(); } catch (e2) {}
+    }, 8000);
+  }
+  function enqueue(u) {
     var synth = window.speechSynthesis;
     if (!synth) return;
+    try { synth.speak(u); } catch (e) {}
+    try { if (synth.resume) synth.resume(); } catch (e2) {}
+    armKeepAlive();
+  }
+  // First tap only. A silent buffer plus resume() is what lets later sound play.
+  function unlockAudio() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var justPrimed = false;
+    if (AC) {
+      try {
+        if (!audioCtx) audioCtx = new AC();
+        var resumed = audioCtx.resume();
+        if (resumed && resumed.then) resumed.then(function () {}, function () {});
+        var rate = audioCtx.sampleRate || 22050;
+        var buffer = audioCtx.createBuffer(1, 1, rate);
+        var source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+        try { source.start(0); } catch (e1) {}
+      } catch (e) {}
+    }
+    var synth = window.speechSynthesis;
+    if (synth && !primed) {
+      primed = true;
+      justPrimed = true;
+      try {
+        var prime = new SpeechSynthesisUtterance(' ');
+        prime.volume = 0;
+        prime.rate = 2;
+        prime.lang = 'en-US';
+        enqueue(prime);
+      } catch (e2) {}
+    }
+    return justPrimed;
+  }
+  function speakKn(kn, voice) {
+    if (!primed || !kn || !voice) return;
     try {
       var k = new SpeechSynthesisUtterance(kn);
       k.lang = voice.lang || 'kn-IN';
       k.rate = 0.85;
       try { k.voice = voice; } catch (e) {}
-      synth.speak(k);
+      enqueue(k);
     } catch (e2) {}
   }
   function say(en, kn) {
+    var token = ++sayToken;
+    var justPrimed = unlockAudio();
     var synth = window.speechSynthesis;
     if (!synth || !en) return;
-    try { synth.cancel(); } catch (e) {}
-    try {
-      var u = new SpeechSynthesisUtterance(en);
-      u.lang = 'en-US';
-      u.rate = 0.9;
-      synth.speak(u);
-    } catch (e3) {}
-    pendingKn = kn || '';
-    if (!kn) return;
-    var voice = knVoice();
-    if (!voice) return;
     pendingKn = '';
-    speakKn(kn, voice);
+    var run = function () {
+      if (token !== sayToken) return;
+      try {
+        var u = new SpeechSynthesisUtterance(en);
+        u.lang = 'en-US';
+        u.rate = 0.9;
+        enqueue(u);
+      } catch (e3) {}
+      pendingKn = kn || '';
+      if (!kn) return;
+      var voice = knVoice();
+      if (!voice) return;
+      pendingKn = '';
+      speakKn(kn, voice);
+    };
+    // cancel() in the same turn as speak() drops the line on iPhone.
+    var busy = false;
+    try { busy = !!(synth.speaking || synth.pending); } catch (e4) {}
+    if (busy && !justPrimed) {
+      try { synth.cancel(); } catch (e5) {}
+      setTimeout(run, 80);
+    } else {
+      run();
+    }
   }
   function wordFor(count) {
     if (count >= 1 && count <= 5) return NUMBERS[count - 1];
@@ -714,18 +786,34 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   });
   nextBtn.addEventListener('click', onNext);
   window.addEventListener('resize', function () { applySize(); });
-  if (window.speechSynthesis && speechSynthesis.getVoices) {
-    try { speechSynthesis.getVoices(); } catch (e) {}
-    speechSynthesis.addEventListener('voiceschanged', function () {
-      try { speechSynthesis.getVoices(); } catch (e) {}
-      if (!pendingKn) return;
+  function bindVoices() {
+    var synth = window.speechSynthesis;
+    if (!synth || !synth.getVoices) return;
+    function deliver() {
+      if (!primed || !pendingKn) return;
       var voice = knVoice();
       if (!voice) return;
       var word = pendingKn;
       pendingKn = '';
       speakKn(word, voice);
-    });
+    }
+    try { synth.getVoices(); } catch (e) {}
+    try {
+      synth.addEventListener('voiceschanged', deliver);
+    } catch (e2) {
+      try { synth.onvoiceschanged = deliver; } catch (e3) {}
+    }
+    var tries = 0;
+    (function retry() {
+      tries += 1;
+      if (tries > 8) return;
+      setTimeout(function () {
+        if (voices().length) deliver();
+        else retry();
+      }, 120);
+    })();
   }
+  bindVoices();
   render(false);
 })();
 </script>
