@@ -350,11 +350,30 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   var line = '';
   var joined = { 4: false, 5: false };
   var factLine = { 4: '2 and 2', 5: '3 and 2' };
-  var pendingKn = '';
-  var audioCtx = null;
-  var primed = false;
-  var keepTimer = 0;
-  var sayToken = 0;
+  var LINES = {
+    'one': 'voice/one.mp3',
+    'two': 'voice/two.mp3',
+    'three': 'voice/three.mp3',
+    'four': 'voice/four.mp3',
+    'five': 'voice/five.mp3',
+    'six': 'voice/six.mp3',
+    'ಒಂದು': 'voice/kn-1.mp3',
+    'ಎರಡು': 'voice/kn-2.mp3',
+    'ಮೂರು': 'voice/kn-3.mp3',
+    'ನಾಲ್ಕು': 'voice/kn-4.mp3',
+    'ಐದು': 'voice/kn-5.mp3',
+    '1 and 1 make 2': 'voice/and-1-1-2.mp3',
+    '2 and 1 make 3': 'voice/and-2-1-3.mp3',
+    '3 and 1 make 4': 'voice/and-3-1-4.mp3',
+    '4 and 1 make 5': 'voice/and-4-1-5.mp3',
+    '5 and 1 make 6': 'voice/and-5-1-6.mp3',
+    '2 and 2 make 4': 'voice/make-2-2-4.mp3',
+    '3 and 2 make 5': 'voice/make-3-2-5.mp3',
+    '4 is 2 and 2': 'voice/is-4-2-2.mp3',
+    '5 is 3 and 2': 'voice/is-5-3-2.mp3'
+  };
+  var clips = {};
+  var started = false;
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var stage = document.getElementById('stage');
@@ -369,111 +388,150 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   function landscape() {
     return window.innerHeight < 520 && window.innerWidth > window.innerHeight;
   }
-  function voices() {
-    var synth = window.speechSynthesis;
-    if (!synth || !synth.getVoices) return [];
-    try { return synth.getVoices() || []; } catch (e) { return []; }
+  function prepareVoice() {
+    Object.keys(LINES).forEach(function (text) {
+      var el = document.createElement('audio');
+      el.preload = 'auto';
+      el.src = LINES[text];
+      el.setAttribute('playsinline', '');
+      el.setAttribute('webkit-playsinline', '');
+      el.setAttribute('data-line', text);
+      el.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(el);
+      clips[text] = el;
+    });
   }
-  function knVoice() {
-    var list = voices();
-    for (var i = 0; i < list.length; i++) {
-      if (String(list[i].lang || '').toLowerCase().indexOf('kn') === 0) return list[i];
+  function lineLang(text) {
+    return /[\u0c80-\u0cff]/.test(text || '') ? 'kn-IN' : 'en-US';
+  }
+  function pickVoice(synth, lang) {
+    var list = [];
+    try { list = (synth.getVoices && synth.getVoices()) || []; } catch (e) {}
+    var want = String(lang || 'en').toLowerCase().split('-')[0];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (String(list[i].lang || '').toLowerCase().indexOf(want) === 0) return list[i];
     }
     return null;
   }
-  // iOS pauses a long utterance unless resume() keeps the engine awake.
-  function armKeepAlive() {
-    var synth = window.speechSynthesis;
-    if (!synth || keepTimer) return;
-    keepTimer = setInterval(function () {
-      var active = false;
-      try { active = !!(synth.speaking || synth.pending); } catch (e) {}
-      if (!active) {
-        clearInterval(keepTimer);
-        keepTimer = 0;
-        return;
-      }
-      try { if (synth.resume) synth.resume(); } catch (e2) {}
-    }, 8000);
-  }
-  function enqueue(u) {
+  function speakFallback(text) {
+    if (!started || !text) return;
     var synth = window.speechSynthesis;
     if (!synth) return;
-    try { synth.speak(u); } catch (e) {}
-    try { if (synth.resume) synth.resume(); } catch (e2) {}
-    armKeepAlive();
-  }
-  // First tap only. A silent buffer plus resume() is what lets later sound play.
-  function unlockAudio() {
-    var AC = window.AudioContext || window.webkitAudioContext;
-    var justPrimed = false;
-    if (AC) {
-      try {
-        if (!audioCtx) audioCtx = new AC();
-        var resumed = audioCtx.resume();
-        if (resumed && resumed.then) resumed.then(function () {}, function () {});
-        var rate = audioCtx.sampleRate || 22050;
-        var buffer = audioCtx.createBuffer(1, 1, rate);
-        var source = audioCtx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioCtx.destination);
-        try { source.start(0); } catch (e1) {}
-      } catch (e) {}
-    }
-    var synth = window.speechSynthesis;
-    if (synth && !primed) {
-      primed = true;
-      justPrimed = true;
-      try {
-        var prime = new SpeechSynthesisUtterance(' ');
-        prime.volume = 0;
-        prime.rate = 2;
-        prime.lang = 'en-US';
-        enqueue(prime);
-      } catch (e2) {}
-    }
-    return justPrimed;
-  }
-  function speakKn(kn, voice) {
-    if (!primed || !kn || !voice) return;
     try {
-      var k = new SpeechSynthesisUtterance(kn);
-      k.lang = voice.lang || 'kn-IN';
-      k.rate = 0.85;
-      try { k.voice = voice; } catch (e) {}
-      enqueue(k);
-    } catch (e2) {}
+      var utterance = new SpeechSynthesisUtterance(text);
+      var lang = lineLang(text);
+      utterance.lang = lang;
+      utterance.rate = lang === 'kn-IN' ? 0.85 : 0.9;
+      var voice = pickVoice(synth, lang);
+      if (voice) utterance.voice = voice;
+      synth.speak(utterance);
+    } catch (e) {}
+  }
+  function watchPlay(el, text) {
+    var pendingPlay;
+    try { pendingPlay = el.play(); }
+    catch (e) {
+      speakFallback(text);
+      return null;
+    }
+    if (pendingPlay && pendingPlay.catch) {
+      pendingPlay.catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        el.setAttribute('data-broken', '1');
+        speakFallback(text);
+      });
+    }
+    return pendingPlay;
+  }
+  function rewind(el) {
+    try {
+      if (el.readyState > 0) el.currentTime = 0;
+    } catch (e) {}
+  }
+  function stopOthers(text) {
+    Object.keys(clips).forEach(function (key) {
+      if (key === text) return;
+      var other = clips[key];
+      if (!other.paused) {
+        try { other.pause(); } catch (e) {}
+      }
+    });
+  }
+  function playHeard(text) {
+    var el = clips[text];
+    if (!el || el.getAttribute('data-broken') === '1') {
+      speakFallback(text);
+      return null;
+    }
+    stopOthers(text);
+    rewind(el);
+    el.muted = false;
+    el.volume = 1;
+    watchPlay(el, text);
+    return el;
+  }
+  function clearFollow(el) {
+    if (!el || !el._follow) return;
+    el.removeEventListener('ended', el._follow);
+    el._follow = null;
+  }
+  function queueKn(el, kn) {
+    clearFollow(el);
+    if (!kn) return;
+    function onEnd() {
+      clearFollow(el);
+      playHeard(kn);
+    }
+    el._follow = onEnd;
+    el.addEventListener('ended', onEnd);
+  }
+  // iOS only allows playback that begins inside the tap. Every clip is play()'d
+  // here; the line we want is audible and the rest are silent unlocks.
+  function beginVoice(en, kn) {
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    } catch (e) {}
+    Object.keys(clips).forEach(function (key) {
+      var el = clips[key];
+      var hear = key === en;
+      el.muted = !hear;
+      el.volume = 1;
+      rewind(el);
+      if (hear) {
+        if (el.getAttribute('data-broken') === '1') speakFallback(key);
+        else {
+          watchPlay(el, key);
+          queueKn(el, kn);
+        }
+        return;
+      }
+      var pendingPlay;
+      try { pendingPlay = el.play(); } catch (e2) { return; }
+      if (pendingPlay && pendingPlay.then) {
+        pendingPlay.then(function () {
+          if (!el.muted) return;
+          try { el.pause(); } catch (e3) {}
+          rewind(el);
+          el.muted = false;
+        }).catch(function () { el.muted = false; });
+      }
+    });
+    if (!clips[en]) {
+      speakFallback(en);
+      if (kn) playHeard(kn);
+    }
   }
   function say(en, kn) {
-    var token = ++sayToken;
-    var justPrimed = unlockAudio();
-    var synth = window.speechSynthesis;
-    if (!synth || !en) return;
-    pendingKn = '';
-    var run = function () {
-      if (token !== sayToken) return;
-      try {
-        var u = new SpeechSynthesisUtterance(en);
-        u.lang = 'en-US';
-        u.rate = 0.9;
-        enqueue(u);
-      } catch (e3) {}
-      pendingKn = kn || '';
-      if (!kn) return;
-      var voice = knVoice();
-      if (!voice) return;
-      pendingKn = '';
-      speakKn(kn, voice);
-    };
-    // cancel() in the same turn as speak() drops the line on iPhone.
-    var busy = false;
-    try { busy = !!(synth.speaking || synth.pending); } catch (e4) {}
-    if (busy && !justPrimed) {
-      try { synth.cancel(); } catch (e5) {}
-      setTimeout(run, 80);
-    } else {
-      run();
+    if (!en) return;
+    if (!started) {
+      started = true;
+      beginVoice(en, kn);
+      return;
     }
+    var el = playHeard(en);
+    if (el) queueKn(el, kn);
+    else if (kn) playHeard(kn);
   }
   function wordFor(count) {
     if (count >= 1 && count <= 5) return NUMBERS[count - 1];
@@ -786,34 +844,7 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   });
   nextBtn.addEventListener('click', onNext);
   window.addEventListener('resize', function () { applySize(); });
-  function bindVoices() {
-    var synth = window.speechSynthesis;
-    if (!synth || !synth.getVoices) return;
-    function deliver() {
-      if (!primed || !pendingKn) return;
-      var voice = knVoice();
-      if (!voice) return;
-      var word = pendingKn;
-      pendingKn = '';
-      speakKn(word, voice);
-    }
-    try { synth.getVoices(); } catch (e) {}
-    try {
-      synth.addEventListener('voiceschanged', deliver);
-    } catch (e2) {
-      try { synth.onvoiceschanged = deliver; } catch (e3) {}
-    }
-    var tries = 0;
-    (function retry() {
-      tries += 1;
-      if (tries > 8) return;
-      setTimeout(function () {
-        if (voices().length) deliver();
-        else retry();
-      }, 120);
-    })();
-  }
-  bindVoices();
+  prepareVoice();
   render(false);
 })();
 </script>
