@@ -60,11 +60,13 @@ body{
 }
 .bar{
   display:grid;
-  grid-template-columns:88px minmax(0,1fr) 88px;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
   align-items:center;
   flex:none;
-  gap:4px;
+  gap:8px;
 }
+#back{justify-self:start}
+#next{justify-self:end}
 .chev{
   width:88px;height:88px;
   border:1.5px solid rgba(228,197,106,.55);
@@ -75,6 +77,16 @@ body{
   padding:0;
   touch-action:manipulation;
   transition:transform 140ms var(--ease);
+}
+.chev.is-word{
+  width:auto;
+  min-width:0;
+  height:64px;
+  padding:0 14px;
+  border-radius:999px;
+  font-size:1.02rem;
+  font-weight:700;
+  letter-spacing:-.02em;
 }
 .chev:active{transform:scale(0.97)}
 .chev.is-off{visibility:hidden}
@@ -89,11 +101,12 @@ body{
   font-variant-numeric:tabular-nums;
 }
 .numeral.is-title{
-  font-size:clamp(2rem, 8.5vw, 2.7rem);
+  font-size:clamp(1.4rem, 5.6vw, 2.5rem);
   letter-spacing:-.03em;
   color:var(--ink);
   font-weight:700;
   line-height:1;
+  white-space:nowrap;
 }
 .kannada{
   margin:4px 0 0;
@@ -155,8 +168,8 @@ body{
   flex-direction:column-reverse;
   align-items:center;
   justify-content:flex-start;
-  gap:8px;
-  padding-bottom:6px;
+  gap:10px;
+  padding:8px 6px 6px;
   position:relative;
   z-index:1;
 }
@@ -167,46 +180,50 @@ body{
   width:100%;
 }
 .cube{
-  border:0;padding:0;
-  border-radius:50%;
-  color:#5c463c;
-  display:grid;place-items:center;
+  border:0;padding:0;margin:0;
+  border-radius:0;
+  background:transparent;
+  color:var(--ink);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
   flex:none;
   position:relative;
-  background:
-    radial-gradient(circle at 34% 30%, rgba(255,255,255,.38), transparent 36%),
-    var(--planet, #d9897c);
-  box-shadow:
-    inset -7px -9px 0 rgba(70,45,40,.1),
-    0 8px 16px rgba(8,6,20,.18);
+  box-shadow:none;
   transition:transform 160ms var(--ease);
   touch-action:manipulation;
 }
-#blocks .cube:nth-child(1){--planet:#d9897c;color:#6a4038}
-#blocks .cube:nth-child(2){--planet:#7eaea6;color:#355650}
-#blocks .cube:nth-child(3){--planet:#e3c87a;color:#6a552c}
-#blocks .cube:nth-child(4){--planet:#9bb592;color:#3d523c}
-#blocks .cube:nth-child(5){--planet:#a7b0d2;color:#434e6c}
-#blocks .cube:nth-child(6){--planet:#c4b6c8;color:#564a5c}
-#blocks .cube:first-child::before{
-  content:"";
-  position:absolute;
-  left:-18%;
-  width:136%;
-  height:13%;
-  top:70%;
-  border-radius:50%;
-  border:3px solid rgba(217,137,124,.5);
-  box-shadow:0 0 0 3px rgba(26,24,54,.25);
-  pointer-events:none;
+.planet-art{
+  width:var(--disk, 96px);
+  height:var(--disk, 96px);
+  flex:none;
+  display:block;
 }
-.cube.counted{
-  box-shadow:
-    inset -7px -9px 0 rgba(70,45,40,.1),
-    0 0 0 3px var(--accent);
+.planet-svg{
+  width:100%;
+  height:100%;
+  display:block;
+  overflow:visible;
+  filter:drop-shadow(0 3px 3px rgba(8,6,20,.35));
+}
+.planet-name{
+  flex:none;
+  font-weight:700;
+  font-size:var(--name, 14px);
+  line-height:1.1;
+  letter-spacing:.01em;
+  color:var(--ink);
+  text-align:center;
+  white-space:nowrap;
+}
+.cube.counted .planet-art{
+  border-radius:50%;
+  outline:3px solid var(--accent);
+  outline-offset:1px;
 }
 .cube:active{transform:scale(0.97)}
-.seed{width:40%;height:40%;display:block}
 .ghost{
   flex:none;
   width:88px;height:88px;
@@ -247,7 +264,14 @@ body{
   line-height:1.3;
   overflow-wrap:anywhere;
 }
-.fact{width:min(100%,440px);padding:2px 0}
+.fact{
+  width:min(100%,520px);
+  min-width:0;
+  padding:2px 0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
 .fact-num{
   margin:0;
   text-align:center;
@@ -258,35 +282,45 @@ body{
   color:var(--accent);
   font-variant-numeric:tabular-nums;
 }
-.piles{display:flex;align-items:flex-end;justify-content:center;gap:14px;margin-top:6px}
+.piles{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:nowrap;
+  gap:8px;
+  margin-top:6px;
+  max-width:100%;
+}
 .pile{
-  min-width:88px;min-height:88px;
-  padding:8px 10px 4px;
-  border:0;border-radius:999px;
-  background:rgba(255,255,255,.045);
+  min-width:0;
+  min-height:0;
+  padding:6px;
+  border:0;
+  border-radius:12px;
+  background:rgba(255,255,255,.06);
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:nowrap;
+  gap:max(4px, calc(var(--star, 40px) * 0.16));
   touch-action:manipulation;
   transition:transform 140ms var(--ease);
 }
 .pile:active{transform:scale(0.97)}
-.stack{display:flex;flex-direction:column-reverse;align-items:center;gap:4px}
-.pile .cube{
-  width:84px;height:72px;
-  border-radius:0;
-  pointer-events:none;
-  --planet:#e4c56a;
-  color:#6a552c;
-  clip-path:polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  box-shadow:none;
-  background:
-    radial-gradient(circle at 50% 42%, rgba(255,255,255,.28), transparent 42%),
-    #e4c56a;
+.star{
+  flex:none;
+  width:var(--star, 40px);
+  height:var(--star, 40px);
+  display:block;
 }
-.pile .seed{width:34%;height:34%;transform:translateY(-8%)}
 .and{
   font-weight:700;
   color:var(--muted);
   align-self:center;
   font-size:1.05rem;
+  flex:none;
+  line-height:1;
 }
 .fact-line{
   margin:8px 0 0;
@@ -305,9 +339,15 @@ html.land .numeral.is-title{font-size:1.7rem}
 html.land .kannada{font-size:1.15rem;min-height:1.2em}
 html.land .en,.html.land .said{font-size:.9rem}
 html.land .world{font-size:.85rem;padding-top:2px}
-html.land #screen-together{flex-direction:row;align-items:flex-end;justify-content:center;gap:8px}
-html.land .pile .cube{width:64px;height:54px}
+html.land #screen-together{flex-direction:row;align-items:center;justify-content:center;gap:8px}
+html.land .fact{flex:1 1 0;width:auto}
 html.land .chev{width:64px;height:64px;font-size:1.8rem}
+html.land .chev.is-word{width:auto;height:48px;font-size:.85rem;padding:0 10px}
+html.land .rocket{display:none}
+@media (max-width:430px){
+  .chev{width:68px;height:68px;font-size:2rem}
+  .chev.is-word{height:52px;font-size:.95rem;padding:0 12px}
+}
 @media (prefers-reduced-motion:reduce){
   .chev,.ghost,.pile,.cube{transition:none}
   .chev:active,.ghost:active,.pile:active,.cube:active{transform:none}
@@ -332,8 +372,8 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   <p class="world" id="world-text">Hold up 1 finger.</p>
 </div>
 <script>
-/* Counting towers. Same taps, speech, and together/split as the
-   original blocks page. Planets and a quiet rocket are paint only. */
+/* Counting towers. One tap adds a planet. Together opens the
+   addition screen. Planets stay in solar order, Mercury first. */
 (function () {
   'use strict';
   var EASE = 'cubic-bezier(0.23, 1, 0.32, 1)';
@@ -347,7 +387,10 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   var SIX = { en: 'six' };
   var index = 0;
   var six = false;
+  var returnIndex = 0;
+  var returnSix = false;
   var line = '';
+  var keepTimer = 0;
   var joined = { 4: false, 5: false };
   var factLine = { 4: '2 and 2', 5: '3 and 2' };
   var LINES = {
@@ -414,19 +457,47 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
     }
     return null;
   }
+  // iOS pauses a long utterance unless resume() keeps the engine awake.
+  function armKeepAlive() {
+    var synth = window.speechSynthesis;
+    if (!synth || keepTimer) return;
+    keepTimer = setInterval(function () {
+      var active = false;
+      try { active = !!(synth.speaking || synth.pending); } catch (e) {}
+      if (!active) {
+        clearInterval(keepTimer);
+        keepTimer = 0;
+        return;
+      }
+      try { if (synth.resume) synth.resume(); } catch (e2) {}
+    }, 8000);
+  }
   function speakFallback(text) {
     if (!started || !text) return;
     var synth = window.speechSynthesis;
     if (!synth) return;
-    try {
-      var utterance = new SpeechSynthesisUtterance(text);
-      var lang = lineLang(text);
-      utterance.lang = lang;
-      utterance.rate = lang === 'kn-IN' ? 0.85 : 0.9;
-      var voice = pickVoice(synth, lang);
-      if (voice) utterance.voice = voice;
-      synth.speak(utterance);
-    } catch (e) {}
+    var run = function () {
+      try {
+        var utterance = new SpeechSynthesisUtterance(text);
+        var lang = lineLang(text);
+        utterance.lang = lang;
+        utterance.rate = lang === 'kn-IN' ? 0.85 : 0.9;
+        var voice = pickVoice(synth, lang);
+        if (voice) utterance.voice = voice;
+        synth.speak(utterance);
+        try { if (synth.resume) synth.resume(); } catch (e2) {}
+        armKeepAlive();
+      } catch (e) {}
+    };
+    // cancel() in the same turn as speak() drops the line on iPhone.
+    var busy = false;
+    try { busy = !!(synth.speaking || synth.pending); } catch (e4) {}
+    if (busy) {
+      try { synth.cancel(); } catch (e5) {}
+      setTimeout(run, 80);
+    } else {
+      run();
+    }
   }
   function watchPlay(el, text) {
     var pendingPlay;
@@ -538,38 +609,78 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
     if (count === 6) return SIX;
     return null;
   }
-  function seed() {
-    var ns = 'http://www.w3.org/2000/svg';
-    var svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('class', 'seed');
-    svg.setAttribute('viewBox', '0 0 48 48');
-    svg.setAttribute('aria-hidden', 'true');
-    function dot(cx) {
-      var c = document.createElementNS(ns, 'circle');
-      c.setAttribute('cx', String(cx));
-      c.setAttribute('cy', '20');
-      c.setAttribute('r', '2.15');
-      c.setAttribute('fill', 'currentColor');
-      return c;
+  var PLANETS = [
+    {
+      id: 'mercury',
+      name: 'Mercury',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="planet-svg"><defs><radialGradient id="mercury-shade" cx="36%" cy="32%" r="70%"><stop offset="0%" stop-color="#f4f5f7"/><stop offset="46%" stop-color="#b7bdc6"/><stop offset="100%" stop-color="#5c636d"/></radialGradient></defs><circle cx="50" cy="50" r="47" fill="url(#mercury-shade)"/><g fill="#6a717b"><circle data-crater="1" cx="30" cy="36" r="8.2"/><circle data-crater="1" cx="67" cy="30" r="5"/><circle data-crater="1" cx="73" cy="58" r="9"/><circle data-crater="1" cx="40" cy="66" r="6.4"/><circle data-crater="1" cx="52" cy="46" r="3.2"/><circle data-crater="1" cx="22" cy="56" r="3.1"/></g><g fill="#eceff3"><circle cx="27.4" cy="33.2" r="4.1"/><circle cx="70" cy="55" r="4.5"/><circle cx="37.6" cy="63.4" r="3.1"/></g></svg>'
+    },
+    {
+      id: 'venus',
+      name: 'Venus',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="planet-svg"><defs><radialGradient id="venus-shade" cx="36%" cy="32%" r="72%"><stop offset="0%" stop-color="#fbe3b0"/><stop offset="48%" stop-color="#e2a44a"/><stop offset="100%" stop-color="#b15f22"/></radialGradient><clipPath id="venus-clip"><circle cx="50" cy="50" r="47"/></clipPath></defs><g clip-path="url(#venus-clip)"><circle cx="50" cy="50" r="47" fill="url(#venus-shade)"/><path data-swirl="1" d="M6 36c18-14 38-8 50 4 12 12 24 12 38 0" fill="none" stroke="#f8e6bf" stroke-width="7" stroke-linecap="round"/><path data-swirl="1" d="M4 52c22-10 36 2 48 10 14 8 26 6 42-8" fill="none" stroke="#c56d2c" stroke-width="8" stroke-linecap="round"/><path data-swirl="1" d="M10 68c18-12 40-8 62 6" fill="none" stroke="#f6d7a4" stroke-width="6" stroke-linecap="round"/><path data-swirl="1" d="M16 26c16 8 26 6 38-4" fill="none" stroke="#f0c98a" stroke-width="5" stroke-linecap="round"/></g></svg>'
+    },
+    {
+      id: 'earth',
+      name: 'Earth',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="planet-svg"><defs><radialGradient id="earth-shade" cx="34%" cy="30%" r="74%"><stop offset="0%" stop-color="#8ec8ef"/><stop offset="52%" stop-color="#2c74b8"/><stop offset="100%" stop-color="#14386c"/></radialGradient><clipPath id="earth-clip"><circle cx="50" cy="50" r="47"/></clipPath></defs><g clip-path="url(#earth-clip)"><circle data-ocean="1" cx="50" cy="50" r="47" fill="url(#earth-shade)"/><path data-continent="1" fill="#3e9a45" d="M30 30c2-4 8-7 12-4 3 2 3 5 1 7 3 1 6 1 7 4 1 4-2 6-1 9 1 2 3 4 2 7-2 4-6 3-8 1-1 3-1 6 2 8-3 2-7 1-9-2-2-2-5-2-6 1-3 1-6-2-6-6 0-3-2-5-1-8 1-4 2-6 4-8 1-3 1-6 3-9z"/><path data-continent="1" fill="#57b05a" d="M40 58c2-1 4 1 5 3 2 3 1 6 3 8 1 3-1 6-3 7-3 1-6-1-7-4-1-2-3-3-5-2-2 2-5 1-6-1-1-3 1-6 2-8 0-2 2-4 4-4 2-1 4 0 7 1z"/><path data-continent="1" fill="#6ec46a" d="M58 34c3-3 8-3 11-1 3 3 3 7 1 10-1 2 0 5-1 7-2 3-5 4-8 3-3-1-4-4-3-7 0-3 1-5 0-8-1-2-1-3 0-4z"/><path data-continent="1" fill="#8ed48a" d="M60 26c4-1 8 1 8 4 0 2-2 3-4 3-3 0-5-1-6-3-1-2-1-4 2-4z"/><ellipse data-polar="1" cx="50" cy="86" rx="18" ry="7" fill="#f4f8fc"/><ellipse cx="28" cy="42" rx="10" ry="3.2" fill="#f7fbff" opacity=".8" transform="rotate(-20 28 42)"/><ellipse cx="66" cy="58" rx="13" ry="3.4" fill="#f7fbff" opacity=".75" transform="rotate(16 66 58)"/></g></svg>'
+    },
+    {
+      id: 'mars',
+      name: 'Mars',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="planet-svg"><defs><radialGradient id="mars-shade" cx="36%" cy="32%" r="72%"><stop offset="0%" stop-color="#f3a078"/><stop offset="50%" stop-color="#d15a32"/><stop offset="100%" stop-color="#8a2d1b"/></radialGradient><clipPath id="mars-clip"><circle cx="50" cy="50" r="47"/></clipPath></defs><g clip-path="url(#mars-clip)"><circle cx="50" cy="50" r="47" fill="url(#mars-shade)"/><path fill="#a33a22" d="M18 48c12-12 28-8 36 0 10 10 22 8 30-2 4 16-2 30-16 36-16 8-36 2-46-12-4-8-6-14-4-22z"/><ellipse data-polar="1" cx="50" cy="16" rx="24" ry="11" fill="#f6f8fc"/><ellipse cx="36" cy="64" rx="4.2" ry="3" fill="#7d2e1c"/><ellipse cx="66" cy="42" rx="3.2" ry="2.2" fill="#efc2aa"/></g></svg>'
+    },
+    {
+      id: 'jupiter',
+      name: 'Jupiter',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="planet-svg"><defs><radialGradient id="jupiter-shade" cx="36%" cy="34%" r="72%"><stop offset="0%" stop-color="#fff8ea"/><stop offset="58%" stop-color="rgba(255,248,234,0)"/><stop offset="100%" stop-color="rgba(92,48,18,.42)"/></radialGradient><clipPath id="jupiter-clip"><circle cx="50" cy="50" r="47"/></clipPath></defs><g clip-path="url(#jupiter-clip)"><rect width="100" height="100" fill="#f0d5aa"/><rect data-band="1" y="6" width="100" height="12" fill="#e6b07a"/><rect data-band="1" y="21" width="100" height="8" fill="#f8e8cb"/><rect data-band="1" y="32" width="100" height="14" fill="#d88852"/><rect data-band="1" y="49" width="100" height="9" fill="#f4e1be"/><rect data-band="1" y="61" width="100" height="13" fill="#c46838"/><rect data-band="1" y="78" width="100" height="12" fill="#e8c48c"/><ellipse data-spot="1" cx="66" cy="56" rx="14" ry="8.5" fill="#c44738"/><ellipse cx="63.5" cy="54.5" rx="7" ry="4" fill="#de6d58"/><circle cx="50" cy="50" r="47" fill="url(#jupiter-shade)"/></g></svg>'
+    },
+    {
+      id: 'saturn',
+      name: 'Saturn',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="planet-svg"><defs><radialGradient id="saturn-shade" cx="38%" cy="34%" r="70%"><stop offset="0%" stop-color="#fff6dc"/><stop offset="55%" stop-color="#f0d39a"/><stop offset="100%" stop-color="#c4a062"/></radialGradient><clipPath id="saturn-front"><rect x="0" y="51" width="100" height="49"/></clipPath></defs><ellipse data-ring="1" cx="50" cy="52" rx="47" ry="13" fill="none" stroke="#e6d2a2" stroke-width="6.5"/><ellipse data-ring="1" cx="50" cy="52" rx="47" ry="13" fill="none" stroke="#a8833f" stroke-width="1.7"/><circle cx="50" cy="50" r="27" fill="url(#saturn-shade)"/><ellipse cx="50" cy="45" rx="22" ry="3.4" fill="none" stroke="#e7cb90" stroke-width="2.6"/><ellipse cx="50" cy="55" rx="20" ry="2.8" fill="none" stroke="#d2b06a" stroke-width="2.2"/><g clip-path="url(#saturn-front)"><ellipse data-ring="1" cx="50" cy="52" rx="47" ry="13" fill="none" stroke="#f4e4ba" stroke-width="6.5"/><ellipse data-ring="1" cx="50" cy="52" rx="39" ry="10" fill="none" stroke="#9a7434" stroke-width="2.2"/></g></svg>'
     }
-    var path = document.createElementNS(ns, 'path');
-    path.setAttribute('d', 'M16 30.5c3.4 3.2 12.6 3.2 16 0');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-width', '2.2');
-    path.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(dot(17));
-    svg.appendChild(dot(31));
-    svg.appendChild(path);
-    return svg;
+  ];
+  function svgFrom(markup) {
+    var tpl = document.createElement('template');
+    tpl.innerHTML = markup;
+    return tpl.content.firstElementChild;
   }
   function makeCube(i) {
+    var planet = PLANETS[i] || PLANETS[PLANETS.length - 1];
     var el = document.createElement('button');
     el.type = 'button';
     el.className = 'cube';
     el.setAttribute('data-i', String(i));
-    el.setAttribute('aria-label', 'Block');
-    el.appendChild(seed());
+    el.setAttribute('data-planet', planet.id);
+    var art = document.createElement('span');
+    art.className = 'planet-art';
+    art.setAttribute('aria-hidden', 'true');
+    art.appendChild(svgFrom(planet.svg));
+    var label = document.createElement('span');
+    label.className = 'planet-name';
+    label.textContent = planet.name;
+    el.appendChild(art);
+    el.appendChild(label);
+    return el;
+  }
+  function starSvg() {
+    function ring(outer, inner) {
+      var parts = [];
+      var i;
+      for (i = 0; i < 10; i++) {
+        var radius = i % 2 ? inner : outer;
+        var angle = -Math.PI / 2 + i * Math.PI / 5;
+        var x = 50 + radius * Math.cos(angle);
+        var y = 50 + radius * Math.sin(angle);
+        parts.push((i ? 'L' : 'M') + x.toFixed(2) + ' ' + y.toFixed(2));
+      }
+      return parts.join('') + 'Z';
+    }
+    var el = svgFrom(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="star"><path fill="#e4c56a" d="' + ring(46, 19) + '"/><path fill="#fff4c8" d="' + ring(20, 8) + '"/></svg>'
+    );
+    el.setAttribute('aria-hidden', 'true');
     return el;
   }
   function pop(el) {
@@ -611,49 +722,129 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
       ], { duration: 260, easing: EASE });
     });
   }
+  function applyDisk(blocks, ghost, disk, land) {
+    var fs = Math.round(disk * 0.22);
+    if (fs > 17) fs = 17;
+    if (fs < 12) fs = 12;
+    if (disk < 48) fs = 11;
+    blocks.style.setProperty('--disk', disk + 'px');
+    blocks.style.setProperty('--name', fs + 'px');
+    if (!ghost) return;
+    var g = Math.round(disk * 0.72);
+    if (g > 84) g = 84;
+    if (g < 48) g = 48;
+    ghost.style.width = g + 'px';
+    ghost.style.height = g + 'px';
+    ghost.style.fontSize = Math.round(g * 0.46) + 'px';
+    ghost.style.marginBottom = land ? 'calc(var(--name) * 1.1 + 4px)' : '0px';
+  }
+  function towerBox(blocks) {
+    var blockStyle = window.getComputedStyle(blocks);
+    var land = blocks.classList.contains('row');
+    var gap = parseFloat(blockStyle.gap) || 0;
+    var main = 0;
+    var cross = 0;
+    var count = 0;
+    Array.prototype.forEach.call(blocks.children, function (el) {
+      var style = window.getComputedStyle(el);
+      var extraMain = land
+        ? (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0)
+        : (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0);
+      var extraCross = land
+        ? (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)
+        : (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0);
+      if (land) {
+        main += el.offsetWidth + extraMain;
+        cross = Math.max(cross, el.offsetHeight + extraCross);
+      } else {
+        main += el.offsetHeight + extraMain;
+        cross = Math.max(cross, el.offsetWidth + extraCross);
+      }
+      count += 1;
+    });
+    if (count > 1) main += gap * (count - 1);
+    var box = land ? { w: main, h: cross } : { w: cross, h: main };
+    box.w += (parseFloat(blockStyle.paddingLeft) || 0) + (parseFloat(blockStyle.paddingRight) || 0);
+    box.h += (parseFloat(blockStyle.paddingTop) || 0) + (parseFloat(blockStyle.paddingBottom) || 0);
+    return box;
+  }
+  function layoutStars() {
+    var screen = document.getElementById('screen-together');
+    if (!screen) return;
+    function fits(size) {
+      screen.style.setProperty('--star', size + 'px');
+      var bounds = screen.getBoundingClientRect();
+      var styles = window.getComputedStyle(screen);
+      var facts = screen.querySelectorAll('.fact');
+      var row = styles.flexDirection.indexOf('row') === 0;
+      var gap = parseFloat(row ? styles.columnGap || styles.gap : styles.rowGap || styles.gap) || 0;
+      var usedMain = 0;
+      var usedCross = 0;
+      Array.prototype.forEach.call(facts, function (fact) {
+        if (row) {
+          usedMain += fact.offsetWidth;
+          usedCross = Math.max(usedCross, fact.offsetHeight);
+        } else {
+          usedMain += fact.offsetHeight;
+          usedCross = Math.max(usedCross, fact.offsetWidth);
+        }
+      });
+      if (facts.length > 1) usedMain += gap * (facts.length - 1);
+      if (row) {
+        if (usedMain > bounds.width + 1 || usedCross > bounds.height + 1) return false;
+      } else if (usedMain > bounds.height + 1 || usedCross > bounds.width + 1) return false;
+      var bits = screen.querySelectorAll('.star, .fact-num, .fact-line, .and');
+      var i;
+      for (i = 0; i < bits.length; i++) {
+        var rect = bits[i].getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return false;
+        if (rect.left < bounds.left - 0.5 || rect.top < bounds.top - 0.5) return false;
+        if (rect.right > bounds.right + 0.5 || rect.bottom > bounds.bottom + 0.5) return false;
+      }
+      var stars = screen.querySelectorAll('.star');
+      for (i = 0; i < stars.length; i++) {
+        var star = stars[i].getBoundingClientRect();
+        if (star.width < size - 1.5 || star.height < size - 1.5) return false;
+      }
+      return true;
+    }
+    var lo = 18;
+    var hi = 64;
+    var best = 18;
+    while (lo <= hi) {
+      var mid = Math.floor((lo + hi) / 2);
+      if (fits(mid)) {
+        best = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    screen.style.setProperty('--star', best + 'px');
+  }
   function applySize() {
     document.documentElement.classList.toggle('land', landscape());
     var screen = document.getElementById('screen-number');
     var blocks = document.getElementById('blocks');
-    if (!screen || !blocks) return;
-    var cubes = blocks.querySelectorAll('.cube');
-    var n = cubes.length || 1;
-    var gap = 8;
-    var ghostEl = document.getElementById('add-one');
-    var land = landscape();
-    if (land) {
-      blocks.classList.add('row');
-      var gh = 88;
-      var h = Math.max(72, Math.min(screen.clientHeight - 16, 120));
-      var availW = Math.max(72, screen.clientWidth - 16 - gh - gap * n);
-      var w = Math.max(72, Math.min(Math.floor(availW / n), h));
-      Array.prototype.forEach.call(cubes, function (el) {
-        el.style.width = w + 'px';
-        el.style.height = w + 'px';
-      });
-      if (ghostEl) {
-        var g = Math.max(72, Math.min(88, w));
-        ghostEl.style.width = g + 'px';
-        ghostEl.style.height = g + 'px';
+    if (screen && blocks) {
+      var land = landscape();
+      blocks.classList.toggle('row', land);
+      var ghost = document.getElementById('add-one');
+      var limitW = Math.max(0, screen.clientWidth - 8);
+      var limitH = Math.max(0, screen.clientHeight - 8);
+      var lo = 34;
+      var hi = land ? 132 : 148;
+      var best = lo;
+      while (lo <= hi) {
+        var mid = Math.floor((lo + hi) / 2);
+        applyDisk(blocks, ghost, mid, land);
+        var box = towerBox(blocks);
+        if (box.w <= limitW && box.h <= limitH) {
+          best = mid;
+          lo = mid + 1;
+        } else hi = mid - 1;
       }
-      return;
+      applyDisk(blocks, ghost, best, land);
     }
-    blocks.classList.remove('row');
-    var ghostH = 88;
-    var avail = screen.clientHeight - ghostH - gap * (n + 1) - 8;
-    var side = Math.floor(avail / n);
-    var maxSide = Math.min(screen.clientWidth - 96, 148);
-    if (!isFinite(side) || side < 88) side = 88;
-    if (side > maxSide) side = maxSide;
-    if (side * n > avail && avail > 0) side = Math.max(72, Math.floor(avail / n));
-    Array.prototype.forEach.call(cubes, function (el) {
-      el.style.width = side + 'px';
-      el.style.height = side + 'px';
-    });
-    if (ghostEl) {
-      ghostEl.style.width = '88px';
-      ghostEl.style.height = '88px';
-    }
+    layoutStars();
   }
   function makeRocket() {
     var el = document.createElement('div');
@@ -666,16 +857,9 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'pile';
-    btn.setAttribute('aria-label', count + (count === 1 ? ' block' : ' blocks'));
-    var stack = document.createElement('span');
-    stack.className = 'stack';
-    for (var i = 0; i < count; i++) {
-      var c = document.createElement('span');
-      c.className = 'cube';
-      c.appendChild(seed());
-      stack.appendChild(c);
-    }
-    btn.appendChild(stack);
+    btn.setAttribute('aria-label', count + (count === 1 ? ' star' : ' stars'));
+    var i;
+    for (i = 0; i < count; i++) btn.appendChild(starSvg());
     return btn;
   }
   function renderFact(total, parts) {
@@ -717,8 +901,9 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
     backBtn.disabled = index === 0;
     if (index === 0) backBtn.setAttribute('aria-hidden', 'true');
     else backBtn.removeAttribute('aria-hidden');
-    nextBtn.textContent = index === 5 ? '↻' : '›';
-    nextBtn.setAttribute('aria-label', index === 5 ? 'Again' : 'Next');
+    nextBtn.textContent = index === 5 ? '↻' : 'Together';
+    nextBtn.setAttribute('aria-label', index === 5 ? 'Again' : 'Together');
+    nextBtn.classList.toggle('is-word', index !== 5);
     stage.textContent = '';
     if (index < 5) {
       numeral.classList.remove('is-title');
@@ -763,6 +948,7 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
       together.appendChild(renderFact(4, [2, 2]));
       together.appendChild(renderFact(5, [3, 2]));
       stage.appendChild(together);
+      applySize();
     }
   }
   function onBlock(btn) {
@@ -771,8 +957,9 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
       n = String(document.querySelectorAll('#blocks .cube[data-count]').length + 1);
       btn.setAttribute('data-count', n);
       btn.classList.add('counted');
-      btn.setAttribute('aria-label', 'Block ' + n);
     }
+    var nameEl = btn.querySelector('.planet-name');
+    if (nameEl) btn.setAttribute('aria-label', nameEl.textContent);
     pop(btn);
     var info = wordFor(Number(n));
     if (!info) return;
@@ -809,15 +996,21 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   }
   function onNext() {
     line = '';
-    six = false;
-    if (index < 5) index += 1;
-    else {
-      index = 0;
-      joined[4] = false;
-      joined[5] = false;
-      factLine[4] = '2 and 2';
-      factLine[5] = '3 and 2';
+    if (index < 5) {
+      returnIndex = index;
+      returnSix = six;
+      index = 5;
+      render(false);
+      return;
     }
+    index = 0;
+    six = false;
+    returnIndex = 0;
+    returnSix = false;
+    joined[4] = false;
+    joined[5] = false;
+    factLine[4] = '2 and 2';
+    factLine[5] = '3 and 2';
     render(false);
   }
   stage.addEventListener('click', function (e) {
@@ -837,8 +1030,13 @@ html.land .chev{width:64px;height:64px;font-size:1.8rem}
   backBtn.addEventListener('click', function () {
     if (index === 0) return;
     line = '';
-    if (index === 4 && six) { six = false; render(false); return; }
-    six = false;
+    if (index === 5) {
+      index = returnIndex;
+      six = returnSix;
+      render(false);
+      return;
+    }
+    if (six) { six = false; render(false); return; }
     index -= 1;
     render(false);
   });

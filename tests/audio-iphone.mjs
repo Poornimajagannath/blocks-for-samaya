@@ -52,6 +52,24 @@ async function arm(page) {
   await page.addInitScript(() => {
     window.__speaks = [];
     window.__plays = [];
+    window.__utterances = [];
+    window.__audioContexts = 0;
+    window.__intervals = [];
+    window.__resumes = 0;
+    const origInterval = window.setInterval.bind(window);
+    window.setInterval = function (fn, ms) {
+      window.__intervals.push(ms);
+      return origInterval(fn, ms);
+    };
+    ['AudioContext', 'webkitAudioContext'].forEach((name) => {
+      const Orig = window[name];
+      if (typeof Orig !== 'function') return;
+      window[name] = function WrappedAudio() {
+        window.__audioContexts += 1;
+        return new Orig(...arguments);
+      };
+      window[name].prototype = Orig.prototype;
+    });
     const origPlay = HTMLAudioElement.prototype.play;
     HTMLAudioElement.prototype.play = function () {
       const rec = {
@@ -76,16 +94,143 @@ async function arm(page) {
       } else rec.settled = 'ok';
       return pendingPlay;
     };
-    const synth = window.speechSynthesis;
-    if (synth && !synth.__wrapped) {
-      const orig = synth.speak.bind(synth);
-      synth.speak = function (utterance) {
-        window.__speaks.push(String(utterance && utterance.text));
-        return orig(utterance);
-      };
-      synth.__wrapped = true;
+    const tapped = new WeakSet();
+    function tapSynth() {
+      const synth = window.speechSynthesis;
+      if (!synth || tapped.has(synth)) return;
+      try {
+        const orig = synth.speak.bind(synth);
+        synth.speak = function (utterance) {
+          const text = String(utterance && utterance.text);
+          window.__speaks.push(text);
+          window.__utterances.push({
+            text,
+            lang: utterance && utterance.lang,
+            rate: utterance && utterance.rate,
+            t: performance.now(),
+          });
+          return orig.apply(this, arguments);
+        };
+        if (synth.resume) {
+          const origResume = synth.resume.bind(synth);
+          synth.resume = function () {
+            window.__resumes += 1;
+            return origResume.apply(this, arguments);
+          };
+        }
+        tapped.add(synth);
+      } catch (err) {
+        window.__armError = String(err);
+      }
     }
+    tapSynth();
+    window.setInterval(tapSynth, 20);
   });
+}
+
+async function openPhone(browser) {
+  const extra = await browser.newPage({ ...iphone });
+  const errors = [];
+  extra.on('pageerror', (err) => errors.push(err.message));
+  extra.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  extra.on('response', (res) => {
+    if (res.status() >= 400) errors.push(res.status() + ' ' + res.url());
+  });
+  await arm(extra);
+  await extra.goto(base, { waitUntil: 'load' });
+  return { extra, errors };
+}
+
+async function checkCancelGap() {
+  const browser = await webkit.launch({ headless: true });
+  const { extra, errors } = await openPhone(browser);
+  try {
+    await extra.evaluate(() => {
+      document.querySelectorAll('audio').forEach((el) => el.setAttribute('data-broken', '1'));
+      const synth = window.speechSynthesis;
+      window.__speaking = false;
+      window.__speechLog = [];
+      Object.defineProperty(synth, 'speaking', {
+        configurable: true,
+        get() { return window.__speaking; },
+      });
+      Object.defineProperty(synth, 'pending', {
+        configurable: true,
+        get() { return false; },
+      });
+      synth.cancel = () => {
+        window.__speechLog.push({ type: 'cancel', t: performance.now() });
+        window.__speaking = false;
+      };
+      synth.speak = (utterance) => {
+        window.__speechLog.push({
+          type: 'speak',
+          t: performance.now(),
+          text: String(utterance.text),
+          lang: utterance.lang,
+        });
+        window.__speaking = true;
+      };
+    });
+    await extra.locator('#blocks .cube').click();
+    await extra.waitForFunction(() => window.__speechLog.some((item) => item.type === 'speak' && item.text === 'one'));
+    const quiet = await extra.evaluate(() => window.__speechLog.slice());
+    assert(quiet.some((item) => item.type === 'speak' && item.text === 'one'), 'fallback did not speak one');
+    assert(!quiet.some((item) => item.type === 'cancel'), 'cancel ran while nothing was speaking');
+
+    await extra.evaluate(() => {
+      window.__speaking = true;
+      window.__speechLog = [];
+    });
+    await extra.locator('#add-one').click();
+    await extra.waitForFunction(() => window.__speechLog.some((item) => item.type === 'speak'));
+    const gap = await extra.evaluate(() => {
+      const log = window.__speechLog;
+      const cancel = log.find((item) => item.type === 'cancel');
+      const speak = log.find((item) => item.type === 'speak');
+      return {
+        text: speak && speak.text,
+        dt: cancel && speak ? speak.t - cancel.t : -1,
+        first: log[0] && log[0].type,
+      };
+    });
+    assert(gap.first === 'cancel', 'busy speech was not cancelled before the next line');
+    assert(gap.text === '1 and 1 make 2', 'gap spoke ' + gap.text);
+    assert(gap.dt >= 60, 'cancel and speak ran in the same turn (' + gap.dt + 'ms)');
+    assert(errors.length === 0, 'gap errors ' + errors.join('\n'));
+  } finally {
+    await extra.close();
+    await browser.close();
+  }
+}
+
+async function checkKannadaFallback() {
+  const browser = await webkit.launch({ headless: true });
+  const { extra, errors } = await openPhone(browser);
+  try {
+    await extra.evaluate(() => {
+      document.querySelector('audio[data-line="ಒಂದು"]').setAttribute('data-broken', '1');
+    });
+    await extra.locator('#blocks .cube').click();
+    await extra.waitForFunction(() => window.__utterances.some((item) => item.text === 'ಒಂದು'));
+    const heard = await extra.evaluate(() => ({
+      speaks: window.__speaks.slice(),
+      kn: window.__utterances.find((item) => item.text === 'ಒಂದು'),
+      resumes: window.__resumes,
+      intervals: window.__intervals.slice(),
+    }));
+    assert(heard.speaks.indexOf('one') === -1, 'english clip fell back to speech');
+    assert(heard.kn.lang === 'kn-IN', 'kannada lang ' + heard.kn.lang);
+    assert(Math.abs(heard.kn.rate - 0.85) < 0.02, 'kannada rate ' + heard.kn.rate);
+    assert(heard.resumes >= 1, 'speech keepalive resume did not run');
+    assert(heard.intervals.indexOf(8000) !== -1, 'speech keepalive interval missing');
+    assert(errors.length === 0, 'kannada errors ' + errors.join('\n'));
+  } finally {
+    await extra.close();
+    await browser.close();
+  }
 }
 
 const pageErrors = [];
@@ -108,9 +253,11 @@ try {
   const before = await page.evaluate(() => ({
     speaks: window.__speaks.slice(),
     plays: window.__plays.length,
+    audioContexts: window.__audioContexts,
   }));
   assert(before.speaks.length === 0, 'spoke before the tap: ' + before.speaks.join(' | '));
   assert(before.plays === 0, 'audio.play before the tap');
+  assert(before.audioContexts === 0, 'AudioContext before the tap');
   assert((await page.locator('#kannada').textContent()) === 'ಒಂದು', 'kannada one');
   assert(await page.locator('#blocks .cube').count() === 1, 'tower is not one');
 
@@ -137,7 +284,7 @@ try {
   assert((await page.locator('#kannada').textContent()) === 'ಎರಡು', 'kannada two');
   assert(await page.locator('#blocks .cube').count() === 2, 'tower is not two');
 
-  for (let i = 0; i < 4; i++) await page.locator('#next').click();
+  await page.locator('#next').click();
   assert((await page.locator('#numeral').textContent()) === 'Together', 'together title');
   assert((await page.locator('#world-text').textContent()) === 'Tap to join. Tap to split.', 'together hint');
   await page.locator('#fact-4 .pile').first().click();
@@ -151,8 +298,17 @@ try {
   assert(after.rejected.length === 0, 'later play rejected ' + JSON.stringify(after.rejected));
   assert(after.pending === 0, 'plays still pending');
   assert(after.speaks.length === 0, 'later speech fallback ' + after.speaks.join(' | '));
+  assert(await page.locator('audio[data-line]').count() === 20, 'voice clips were dropped');
   assert(pageErrors.length === 0, 'page errors ' + pageErrors.join('\n'));
   assert(consoleErrors.length === 0, 'console errors ' + consoleErrors.join('\n'));
+
+  await page.evaluate(() => {
+    document.querySelectorAll('audio').forEach((el) => {
+      try { el.pause(); } catch (err) {}
+    });
+  });
+  await checkCancelGap();
+  await checkKannadaFallback();
   console.log('audio iphone passed');
 } catch (err) {
   console.error('audio iphone failed');

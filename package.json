@@ -1,0 +1,10 @@
+{
+  "name": "blocks-for-samaya",
+  "private": true,
+  "scripts": {
+    "test": "node tests/audio-iphone.mjs && node tests/screens.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.2"
+  }
+}
