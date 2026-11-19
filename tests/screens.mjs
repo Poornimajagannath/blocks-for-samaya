@@ -25,7 +25,9 @@ const COUNTS = [
   { n: 3, kn: 'ಮೂರು', en: 'three' },
   { n: 4, kn: 'ನಾಲ್ಕು', en: 'four' },
   { n: 5, kn: 'ಐದು', en: 'five' },
-  { n: 6, kn: '', en: 'six' },
+  { n: 6, kn: 'ಆರು', en: 'six' },
+  { n: 7, kn: 'ಏಳು', en: 'seven' },
+  { n: 8, kn: 'ಎಂಟು', en: 'eight' },
 ];
 const PLANETS = [
   { id: 'mercury', name: 'Mercury', mark: 'crater', min: 4 },
@@ -34,10 +36,18 @@ const PLANETS = [
   { id: 'mars', name: 'Mars', mark: 'polar', min: 1 },
   { id: 'jupiter', name: 'Jupiter', mark: 'spot', min: 1 },
   { id: 'saturn', name: 'Saturn', mark: 'ring', min: 2 },
+  { id: 'uranus', name: 'Uranus', mark: 'ring', min: 2 },
+  { id: 'neptune', name: 'Neptune', mark: 'band', min: 3 },
 ];
+const FILLS = {
+  gold: '#e4c56a',
+  ice: '#8fb4d4',
+  coral: '#e07a5f',
+  mint: '#5eaea0',
+};
 const SPLIT = {
-  4: { stars: 4, piles: [2, 2], line: '2 and 2' },
-  5: { stars: 5, piles: [3, 2], line: '3 and 2' },
+  4: { kind: 'star', count: 4, piles: [2, 2], tones: ['gold', 'gold', 'ice', 'ice'], line: '2 and 2' },
+  5: { kind: 'rocket', count: 5, piles: [3, 2], tones: ['coral', 'coral', 'coral', 'mint', 'mint'], line: '3 and 2' },
 };
 
 const viewports = [
@@ -111,7 +121,7 @@ async function audit(page, label) {
     }
     const problems = [];
     const nodes = [];
-    const selectors = ['#numeral', '#kannada', '#en', '#said', '#back', '#next', '#world-text', '.planet-art', '.planet-name', '#add-one', '.rocket', '.star', '.fact-num', '.fact-line', '.and'];
+    const selectors = ['#numeral', '#kannada', '#en', '#said', '#back', '#next', '#world-text', '.planet-art', '.planet-name', '#add-one', '.rocket', '.token', '.join', '.fact-num', '.fact-line', '.and'];
     selectors.forEach((sel) => {
       document.querySelectorAll(sel).forEach((el, index) => {
         if (!shown(el)) return;
@@ -159,9 +169,14 @@ async function assertCounting(page, n) {
   assert(await page.locator('#next').getAttribute('aria-label') === 'Together', 'together label');
   assert(await page.locator('[aria-label="Next"]').count() === 0, 'a Next control is still on the page');
   assert(await page.locator('button', { hasText: /^›$/ }).count() === 0, 'the next arrow is still a control');
-  const addLabel = n === 6 ? 'Back to 5' : 'Add one';
-  assert(await page.locator('#add-one').getAttribute('aria-label') === addLabel, 'add control on ' + n);
-  assert(await page.locator('#add-one').count() === 1, 'more than one add control');
+  if (n < 8) {
+    assert(await page.locator('#add-one').getAttribute('aria-label') === 'Add one', 'add control on ' + n);
+    assert((await page.locator('#add-one').textContent()) === '+', 'add control is not + on ' + n);
+    assert(await page.locator('button', { hasText: /^\+$/ }).count() === 1, 'more than one add control');
+  } else {
+    assert(await page.locator('#add-one').count() === 0, 'screen 8 still offers another planet');
+    assert(await page.locator('button', { hasText: /^\+$/ }).count() === 0, 'a plus control is still on screen 8');
+  }
   const seen = await page.locator('#blocks .cube').evaluateAll((els) => els.map((el) => ({
     id: el.getAttribute('data-planet'),
     name: el.querySelector('.planet-name').textContent,
@@ -173,6 +188,7 @@ async function assertCounting(page, n) {
       spot: el.querySelectorAll('[data-spot]').length,
       band: el.querySelectorAll('[data-band]').length,
       ring: el.querySelectorAll('[data-ring]').length,
+      tilt: el.querySelectorAll('[data-tilt]').length,
     },
     svg: el.querySelector('svg').outerHTML,
     nameSize: parseFloat(getComputedStyle(el.querySelector('.planet-name')).fontSize),
@@ -184,24 +200,59 @@ async function assertCounting(page, n) {
     assert(item.name === planet.name, 'label ' + item.name);
     assert(item.marks[planet.mark] >= planet.min, planet.name + ' is missing its ' + planet.mark);
     if (planet.id === 'jupiter') assert(item.marks.band >= 4, 'Jupiter has no bands');
-    if (planet.id !== 'saturn') assert(item.marks.ring === 0, planet.name + ' is wearing rings');
+    if (planet.id !== 'saturn' && planet.id !== 'uranus') assert(item.marks.ring === 0, planet.name + ' is wearing rings');
+    if (planet.id === 'uranus') {
+      assert(item.marks.tilt >= 1, 'Uranus ring is not tilted');
+      assert(item.svg.includes('rotate(-26'), 'Uranus ring is level');
+      assert(item.svg.includes('#73d0e2'), 'Uranus is not ice blue');
+      assert(item.marks.continent === 0, 'Uranus has continents');
+    }
+    if (planet.id === 'neptune') {
+      assert(item.marks.continent === 0, 'Neptune has continents');
+      assert(item.svg.includes('#2a4ec0'), 'Neptune is not royal blue');
+      assert(item.svg.includes('#0c1c6e'), 'Neptune is missing its deep blue');
+    }
+    if (planet.id === 'saturn') {
+      assert(item.marks.tilt === 0, 'Saturn ring is tilted');
+      assert(item.svg.includes('#e6d2a2'), 'Saturn lost its gold ring');
+    }
+    if (planet.id === 'earth') assert(item.marks.continent >= 2, 'Earth lost its land');
     assert(item.nameSize >= 11, planet.name + ' label is ' + item.nameSize + 'px');
   });
   await assertLand(page);
   await audit(page, 'count ' + n);
 }
 
-async function assertStars(page, total, expected) {
+async function assertFact(page, total, expected) {
   const fact = page.locator('#fact-' + total);
-  assert(await fact.locator('.star').count() === expected.stars, total + ' shows ' + await fact.locator('.star').count() + ' stars');
-  const piles = await fact.locator('.pile').evaluateAll((els) => els.map((el) => el.querySelectorAll('.star').length));
+  assert(await fact.getAttribute('data-kind') === expected.kind, total + ' kind');
+  assert(await fact.locator('.token').count() === expected.count, total + ' shows ' + await fact.locator('.token').count());
+  if (expected.kind === 'star') {
+    assert(await fact.locator('.star').count() === expected.count, total + ' stars');
+    assert(await fact.locator('.ship').count() === 0, 'rockets leaked into the star fact');
+  } else {
+    assert(await fact.locator('.ship').count() === expected.count, total + ' rockets');
+    assert(await fact.locator('.star').count() === 0, 'stars leaked into the rocket fact');
+  }
+  const piles = await fact.locator('.pile').evaluateAll((els) => els.map((el) => el.querySelectorAll('.token').length));
   assert(JSON.stringify(piles) === JSON.stringify(expected.piles), total + ' groups ' + JSON.stringify(piles));
+  const tones = await fact.locator('.token').evaluateAll((els) => els.map((el) => el.getAttribute('data-tone')));
+  assert(JSON.stringify(tones) === JSON.stringify(expected.tones), total + ' tones ' + JSON.stringify(tones));
+  const fills = await fact.locator('.token').evaluateAll((els) => els.map((el) => {
+    const body = el.querySelector('[data-body]');
+    const path = body || el.querySelector('path');
+    return (path.getAttribute('fill') || '').toLowerCase();
+  }));
+  const expectFills = expected.tones.map((tone) => FILLS[tone]);
+  assert(JSON.stringify(fills) === JSON.stringify(expectFills), total + ' fills ' + JSON.stringify(fills));
+  assert(new Set(fills).size === 2, total + ' does not keep two colors');
   assert((await fact.locator('.fact-line').textContent()) === expected.line, total + ' line');
+  assert((await fact.locator('.join').textContent()) === (expected.piles.length === 1 ? 'Split' : 'Join'), total + ' join label');
   const problems = await fact.evaluate((el) => {
     const problems = [];
     const centers = [];
     [...el.querySelectorAll('.pile')].forEach((pile, index) => {
-      const stars = [...pile.querySelectorAll('.star')]
+      const stars = [...pile.querySelectorAll('.token')]
         .map((star) => star.getBoundingClientRect())
         .sort((a, b) => a.left - b.left);
       const gaps = [];
@@ -234,13 +285,13 @@ async function assertTogether(page, facts) {
   assert(await page.locator('#blocks').count() === 0, 'planets leaked onto together');
   assert(await page.locator('#next').getAttribute('aria-label') === 'Again', 'reset control');
   assert(await page.locator('#add-one').count() === 0, 'add control is on the addition screen');
-  await assertStars(page, 4, facts[4]);
-  await assertStars(page, 5, facts[5]);
+  await assertFact(page, 4, facts[4]);
+  await assertFact(page, 5, facts[5]);
   const sameSize = await page.evaluate(() => {
-    const widths = [...document.querySelectorAll('.star')].map((el) => el.getBoundingClientRect().width);
+    const widths = [...document.querySelectorAll('.token')].map((el) => el.getBoundingClientRect().width);
     return widths.every((width) => Math.abs(width - widths[0]) <= 1.5);
   });
-  assert(sameSize, 'stars are different sizes on one screen');
+  assert(sameSize, 'stars and rockets are different sizes on one screen');
   await assertLand(page);
   await audit(page, 'together ' + facts[4].line + ' / ' + facts[5].line);
 }
@@ -249,58 +300,82 @@ async function walk(page, takeShots) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(base, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
+  const fontReady = await page.evaluate(() => document.fonts.check('32px "Blocks Kannada"'));
+  assert(fontReady, 'Kannada font did not load');
 
   await assertCounting(page, 1);
   assert(await page.locator('#back').isDisabled(), 'back is active on one');
-  await page.locator('#blocks .cube').first().click();
+  await page.locator('[data-planet="mercury"]').click();
   await assertCounting(page, 1);
+  assert((await page.locator('#said').textContent()) === 'Mercury, one', 'mercury speech line');
+  assert(await page.locator('[data-planet="mercury"]').evaluate((el) => el.classList.contains('counted')), 'mercury did not glow');
+
   await page.locator('#next').click();
   await assertTogether(page, SPLIT);
   if (takeShots) await page.screenshot({ path: join(shots, 'together-split.png') });
+
+  await page.locator('#fact-4 .token').nth(1).click();
+  await assertTogether(page, SPLIT);
+  assert(await page.locator('#fact-4 .token.is-lit').count() === 1, 'star tap did not light');
+  assert((await page.locator('#said').textContent()) === 'two', 'second star did not count two');
+  await page.locator('#fact-5 .token').nth(3).click();
+  await assertTogether(page, SPLIT);
+  assert((await page.locator('#said').textContent()) === 'one', 'first rocket of the second group did not count one');
+  assert(await page.locator('#fact-5 .ship.is-lit').count() === 1, 'rocket tap did not light');
+
   await page.locator('#back').click();
   await assertCounting(page, 1);
 
-  for (let n = 2; n <= 6; n++) {
+  for (let n = 2; n <= 8; n++) {
     await page.locator('#add-one').click();
     await assertCounting(page, n);
-    if (takeShots && n === 5) await page.screenshot({ path: join(shots, 'counting-planets.png') });
-    if (takeShots && n === 6) await page.screenshot({ path: join(shots, 'counting-saturn.png') });
+    if (takeShots && n === 8) await page.screenshot({ path: join(shots, 'counting-eight.png') });
   }
 
-  await page.locator('#add-one').click();
-  await assertCounting(page, 5);
+  await page.locator('[data-planet="uranus"]').click();
+  assert((await page.locator('#said').textContent()) === 'Uranus, seven', 'uranus speech line');
+  await page.locator('[data-planet="neptune"]').click();
+  assert((await page.locator('#said').textContent()) === 'Neptune, eight', 'neptune speech line');
+  await assertCounting(page, 8);
+
   await page.locator('#next').click();
   await assertTogether(page, SPLIT);
 
-  await page.locator('#fact-4 .pile').first().click();
+  await page.locator('#fact-4 .join').click();
   const joinedFour = {
-    4: { stars: 4, piles: [4], line: '2 and 2 make 4' },
+    4: { kind: 'star', count: 4, piles: [4], tones: ['gold', 'gold', 'ice', 'ice'], line: '2 and 2 make 4' },
     5: SPLIT[5],
   };
   await assertTogether(page, joinedFour);
-  if (takeShots) await page.screenshot({ path: join(shots, 'together-2-and-2.png') });
 
-  await page.locator('#fact-4 .pile').first().click();
+  await page.locator('#fact-4 .join').click();
   await assertTogether(page, {
-    4: { stars: 4, piles: [2, 2], line: '4 is 2 and 2' },
+    4: { kind: 'star', count: 4, piles: [2, 2], tones: ['gold', 'gold', 'ice', 'ice'], line: '4 is 2 and 2' },
     5: SPLIT[5],
   });
 
-  await page.locator('#fact-5 .pile').first().click();
+  await page.locator('#fact-5 .join').click();
   await assertTogether(page, {
-    4: { stars: 4, piles: [2, 2], line: '4 is 2 and 2' },
-    5: { stars: 5, piles: [5], line: '3 and 2 make 5' },
+    4: { kind: 'star', count: 4, piles: [2, 2], tones: ['gold', 'gold', 'ice', 'ice'], line: '4 is 2 and 2' },
+    5: { kind: 'rocket', count: 5, piles: [5], tones: ['coral', 'coral', 'coral', 'mint', 'mint'], line: '3 and 2 make 5' },
   });
 
-  await page.locator('#fact-4 .pile').first().click();
-  await assertTogether(page, {
-    4: { stars: 4, piles: [4], line: '2 and 2 make 4' },
-    5: { stars: 5, piles: [5], line: '3 and 2 make 5' },
-  });
-  if (takeShots) await page.screenshot({ path: join(shots, 'together-both-joined.png') });
+  await page.locator('#fact-4 .join').click();
+  const both = {
+    4: { kind: 'star', count: 4, piles: [4], tones: ['gold', 'gold', 'ice', 'ice'], line: '2 and 2 make 4' },
+    5: { kind: 'rocket', count: 5, piles: [5], tones: ['coral', 'coral', 'coral', 'mint', 'mint'], line: '3 and 2 make 5' },
+  };
+  await assertTogether(page, both);
+  if (takeShots) await page.screenshot({ path: join(shots, 'together-joined.png') });
+
+  await page.locator('#fact-5 .ship').nth(4).click();
+  assert((await page.locator('#said').textContent()) === 'five', 'joined rockets did not count to five');
+  await page.locator('#fact-4 .star').nth(3).click();
+  assert((await page.locator('#said').textContent()) === 'four', 'joined stars did not count to four');
+  await assertTogether(page, both);
 
   await page.locator('#back').click();
-  await assertCounting(page, 5);
+  await assertCounting(page, 8);
   await page.locator('#next').click();
   await page.locator('#next').click();
   await assertCounting(page, 1);

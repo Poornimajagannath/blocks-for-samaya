@@ -175,9 +175,9 @@ async function checkCancelGap() {
       };
     });
     await extra.locator('#blocks .cube').click();
-    await extra.waitForFunction(() => window.__speechLog.some((item) => item.type === 'speak' && item.text === 'one'));
+    await extra.waitForFunction(() => window.__speechLog.some((item) => item.type === 'speak' && item.text === 'Mercury, one'));
     const quiet = await extra.evaluate(() => window.__speechLog.slice());
-    assert(quiet.some((item) => item.type === 'speak' && item.text === 'one'), 'fallback did not speak one');
+    assert(quiet.some((item) => item.type === 'speak' && item.text === 'Mercury, one'), 'fallback did not speak Mercury, one');
     assert(!quiet.some((item) => item.type === 'cancel'), 'cancel ran while nothing was speaking');
 
     await extra.evaluate(() => {
@@ -265,16 +265,18 @@ try {
   await page.waitForFunction(() => {
     const plays = window.__plays;
     if (!plays.length || plays.some((item) => item.settled === 'pending')) return false;
-    const one = plays.find((item) => item.line === 'one' && !item.muted);
+    const one = plays.find((item) => item.line === 'Mercury, one' && !item.muted);
     const kn = plays.find((item) => item.line === 'ಒಂದು' && !item.muted);
     return one && one.during && one.settled === 'ok' && kn && kn.settled === 'ok';
   });
   const first = await page.evaluate(() => ({
     speaks: window.__speaks.slice(),
     rejected: window.__plays.filter((item) => item.settled.indexOf('err') === 0 || item.settled.indexOf('throw') === 0),
-    one: window.__plays.find((item) => item.line === 'one' && !item.muted),
+    one: window.__plays.find((item) => item.line === 'Mercury, one' && !item.muted),
+    audioContexts: window.__audioContexts,
   }));
-  assert(first.one && first.one.during && first.one.settled === 'ok', 'one play ' + JSON.stringify(first.one));
+  assert(first.one && first.one.during && first.one.settled === 'ok', 'mercury play ' + JSON.stringify(first.one));
+  assert(first.audioContexts === 0, 'AudioContext during the first tap');
   assert(first.rejected.length === 0, 'play rejected ' + JSON.stringify(first.rejected));
   assert(first.speaks.length === 0, 'fell back to speech ' + first.speaks.join(' | '));
 
@@ -286,8 +288,13 @@ try {
 
   await page.locator('#next').click();
   assert((await page.locator('#numeral').textContent()) === 'Together', 'together title');
-  assert((await page.locator('#world-text').textContent()) === 'Tap to join. Tap to split.', 'together hint');
-  await page.locator('#fact-4 .pile').first().click();
+  assert((await page.locator('#world-text').textContent()) === 'Tap one to count.', 'together hint');
+  await page.locator('#fact-4 .token').first().click();
+  await page.waitForFunction(() => window.__plays.some((item) => item.line === 'one' && !item.muted && item.during && item.settled === 'ok'));
+  assert(await page.locator('#fact-4').getAttribute('data-joined') === 'false', 'counting a star joined the group');
+  await page.locator('#fact-5 .ship').nth(2).click();
+  await page.waitForFunction(() => window.__plays.some((item) => item.line === 'three' && !item.muted && item.during && item.settled === 'ok'));
+  await page.locator('#fact-4 .join').click();
   await page.waitForFunction(() => window.__plays.some((item) => item.line === '2 and 2 make 4' && !item.muted && item.during && item.settled === 'ok'));
 
   const after = await page.evaluate(() => ({
@@ -298,9 +305,30 @@ try {
   assert(after.rejected.length === 0, 'later play rejected ' + JSON.stringify(after.rejected));
   assert(after.pending === 0, 'plays still pending');
   assert(after.speaks.length === 0, 'later speech fallback ' + after.speaks.join(' | '));
-  assert(await page.locator('audio[data-line]').count() === 20, 'voice clips were dropped');
+  assert(await page.locator('audio[data-line]').count() === 33, 'voice clips were dropped');
   assert(pageErrors.length === 0, 'page errors ' + pageErrors.join('\n'));
   assert(consoleErrors.length === 0, 'console errors ' + consoleErrors.join('\n'));
+
+  await page.locator('#back').click();
+  assert((await page.locator('#numeral').textContent()) === '2', 'together did not return to two');
+  const added = ['2 and 1 make 3', '3 and 1 make 4', '4 and 1 make 5', '5 and 1 make 6', '6 and 1 make 7', '7 and 1 make 8'];
+  for (const phrase of added) {
+    await page.locator('#add-one').click();
+    await page.waitForFunction((expected) => window.__plays.some((item) => item.line === expected && !item.muted && item.during && item.settled === 'ok'), phrase);
+  }
+  assert((await page.locator('#numeral').textContent()) === '8', 'tower did not reach eight');
+  await page.locator('[data-planet="uranus"]').click();
+  await page.waitForFunction(() => window.__plays.some((item) => item.line === 'Uranus, seven' && !item.muted && item.during && item.settled === 'ok'));
+  await page.locator('[data-planet="neptune"]').click();
+  await page.waitForFunction(() => window.__plays.some((item) => item.line === 'Neptune, eight' && !item.muted && item.during && item.settled === 'ok'));
+  const planetSpeech = await page.evaluate(() => ({
+    speaks: window.__speaks.slice(),
+    audioContexts: window.__audioContexts,
+  }));
+  assert(planetSpeech.speaks.length === 0, 'planet names fell back to speech ' + planetSpeech.speaks.join(' | '));
+  assert(planetSpeech.audioContexts === 0, 'AudioContext after planet taps');
+  assert(pageErrors.length === 0, 'page errors after planets ' + pageErrors.join('\n'));
+  assert(consoleErrors.length === 0, 'console errors after planets ' + consoleErrors.join('\n'));
 
   await page.evaluate(() => {
     document.querySelectorAll('audio').forEach((el) => {
