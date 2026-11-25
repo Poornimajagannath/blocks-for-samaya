@@ -132,6 +132,9 @@ async function audit(page, label) {
     });
     nodes.forEach((item) => {
       if (clipped(item.el)) problems.push(item.sel + ' "' + item.name + '" is clipped');
+      const size = parseFloat(getComputedStyle(item.el).fontSize);
+      const text = (item.el.textContent || '').trim();
+      if (text && size < 16) problems.push(item.sel + ' "' + item.name + '" is ' + size + 'px');
     });
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
@@ -217,7 +220,7 @@ async function assertCounting(page, n) {
       assert(item.svg.includes('#e6d2a2'), 'Saturn lost its gold ring');
     }
     if (planet.id === 'earth') assert(item.marks.continent >= 2, 'Earth lost its land');
-    assert(item.nameSize >= 11, planet.name + ' label is ' + item.nameSize + 'px');
+    assert(item.nameSize >= 16, planet.name + ' label is ' + item.nameSize + 'px');
   });
   await assertLand(page);
   await audit(page, 'count ' + n);
@@ -250,30 +253,39 @@ async function assertFact(page, total, expected) {
   assert((await fact.locator('.join').textContent()) === (expected.piles.length === 1 ? 'Split' : 'Join'), total + ' join label');
   const problems = await fact.evaluate((el) => {
     const problems = [];
-    const centers = [];
+    const pileCenters = [];
     [...el.querySelectorAll('.pile')].forEach((pile, index) => {
-      const stars = [...pile.querySelectorAll('.token')]
-        .map((star) => star.getBoundingClientRect())
-        .sort((a, b) => a.left - b.left);
+      const vertical = getComputedStyle(pile).flexDirection.indexOf('column') === 0;
+      const stars = [...pile.querySelectorAll('.token')].map((star) => star.getBoundingClientRect());
+      const ordered = stars.slice().sort((a, b) => (vertical ? a.top - b.top : a.left - b.left));
       const gaps = [];
-      for (let i = 1; i < stars.length; i++) {
-        const gap = stars[i].left - stars[i - 1].right;
+      for (let i = 1; i < ordered.length; i++) {
+        const gap = vertical
+          ? ordered[i].top - ordered[i - 1].bottom
+          : ordered[i].left - ordered[i - 1].right;
         if (gap <= 0.5) problems.push('group ' + index + ' stars overlap');
         gaps.push(gap);
       }
       gaps.forEach((gap) => {
         if (Math.abs(gap - gaps[0]) > 2) problems.push('group ' + index + ' gaps are uneven');
       });
-      stars.forEach((rect) => {
-        centers.push((rect.top + rect.bottom) / 2);
-        if (Math.abs(rect.width - stars[0].width) > 1.5 || Math.abs(rect.height - stars[0].height) > 1.5) {
+      ordered.forEach((rect) => {
+        if (Math.abs(rect.width - ordered[0].width) > 1.5 || Math.abs(rect.height - ordered[0].height) > 1.5) {
           problems.push('group ' + index + ' star sizes differ');
         }
-        if (Math.abs(rect.top - stars[0].top) > 2) problems.push('group ' + index + ' stars are not level');
+        if (vertical) {
+          const mid = (rect.left + rect.right) / 2;
+          const mid0 = (ordered[0].left + ordered[0].right) / 2;
+          if (Math.abs(mid - mid0) > 2) problems.push('group ' + index + ' stars are not centered');
+        } else if (Math.abs(rect.top - ordered[0].top) > 2) {
+          problems.push('group ' + index + ' stars are not level');
+        }
       });
+      const box = pile.getBoundingClientRect();
+      pileCenters.push((box.top + box.bottom) / 2);
     });
-    centers.forEach((y) => {
-      if (Math.abs(y - centers[0]) > 2) problems.push('stars in this fact are not on one line');
+    pileCenters.forEach((y) => {
+      if (Math.abs(y - pileCenters[0]) > 3) problems.push('groups in this fact are not aligned');
     });
     return problems;
   });
